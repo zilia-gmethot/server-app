@@ -1,0 +1,43 @@
+name: Playwright Tests
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+jobs:
+  test:
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Ensure browsers are installed
+        run: python -m playwright install --with-deps
+      - name: Launch app
+        run: |
+          nohup fastapi dev src/main.py &
+
+          for i in {1..10}; do
+            curl -s http://localhost:8000/healthcheck && break
+            echo "Waiting for API to be ready..."
+            sleep 3
+          done
+
+          if ! curl -s http://localhost:8000/healthcheck; then
+            echo "API is not ready after waiting for 30 seconds."
+            exit 1
+          fi
+      - name: Run your tests
+        run: pytest --tracing=retain-on-failure
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-traces
+          path: test-results/
