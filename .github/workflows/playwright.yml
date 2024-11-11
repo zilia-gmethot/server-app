@@ -20,6 +20,20 @@ jobs:
           pip install -r requirements.txt
       - name: Ensure browsers are installed
         run: python -m playwright install --with-deps
+      - name: Launch app
+        run: |
+          nohup fastapi dev src/main.py &
+
+          for i in {1..10}; do
+            curl -s http://localhost:8000/healthcheck && break
+            echo "Waiting for API to be ready..."
+            sleep 3
+          done
+
+          if ! curl -s http://localhost:8000/healthcheck; then
+            echo "API is not ready after waiting for 30 seconds."
+            exit 1
+          fi
       - name: Run your tests
         run: pytest --tracing=retain-on-failure
       - uses: actions/upload-artifact@v4
